@@ -1,0 +1,14 @@
+[Unit]
+Description=Vibration Service
+After=network.target
+StartLimitIntervalSec=0
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+StandardOutput=append:/var/lib/vibration/vibrationOutput.log
+StandardError=append:/var/lib/vibration/vibrationError.log
+ExecStart=/var/lib/vibration/vibration
+[Install]
+WantedBy=multi-user.target
