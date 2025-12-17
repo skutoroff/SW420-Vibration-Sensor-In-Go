@@ -46,6 +46,7 @@ var	err				error
 //	GPIO Configuration
 var	chip		= "gpiochip0"
 var	offset1		= 17					// GPIO 17 on pin 11
+var	offset2		= 27					// GPIO 27 on pin 13, not seeing anything here
 var	debounceMS	time.Duration	= 375	// debounce millisecs, 75, 150, 250 did ringing
 
 //	Timer to delay action while vibration sensor reacts to event
@@ -55,6 +56,7 @@ var	pauseDur	time.Duration		= 30*time.Second	// wait time after event
 var	timerDeBounce	*time.Timer
 var	superDebounce	time.Duration	= 2*time.Second		// longest debounce ring case
 var	inDeBounce		bool			= false
+var	iDebounceCnt	int				= 0
 
 // areDevicesPaired func returns boolean
 //	Compare two device names, return true if same device and one is rising, other falling
@@ -162,7 +164,8 @@ func eventHandler(evt gpiocdev.LineEvent) {
 	var edge	string	= "rising"
 
 	if inDeBounce {
-		log.Error("vibration.eventHandler - inDeBounce true - skipping event")
+		//log.Error("vibration.eventHandler - inDeBounce true - skipping event")
+		iDebounceCnt++
 	} else {
 		inDeBounce = true								//	Skip until timer expires...
 		resetTimer( timerDeBounce, superDebounce )		//	Reset the timer
@@ -195,7 +198,7 @@ func eventHandler(evt gpiocdev.LineEvent) {
 func main() {
 	log.Error("vibration.go - " + Version)
 
-	// 1. Set up the GPIO with a handler function on state transitions
+    // 1.1 Set up 1st GPIO with a handler function on state transitions, 1st of 2
 	l, err := gpiocdev.RequestLine(
 		chip,
 		offset1,
@@ -204,10 +207,26 @@ func main() {
 		gpiocdev.WithEventHandler(eventHandler) )
 	if err != nil {
 		if err == syscall.Errno(22) {
-			log.Error("vibration.main 1.1 - Note: the WithPullUp option requires Linux 5.5 or later - check kernel version.")
+			log.Error("vibration.main 1.1 - RequestLine error 22")
+		} else {
+		log.Error("vibration.main 1.2 - RequestLine returned error: %s", err)
+		// os.Exit(1)           -- removed, under systemd this would restart forever.
 		}
+	}
+	// 1.2 Set up the 2nd GPIO, 2nd of 2
+	l, err = gpiocdev.RequestLine(
+		chip,
+		offset2,
+		gpiocdev.WithPullUp,
+		gpiocdev.WithBothEdges,
+		gpiocdev.WithEventHandler(eventHandler) )
+	if err != nil {
+		if err == syscall.Errno(22) {
+			log.Error("vibration.main 1.1 - Note: the WithPullUp option requires Linux 5.5 or later - check kernel version.")
+		} else {
 		log.Error("vibration.main 1.2 - RequestLine returned error: %s", err)
 		// os.Exit(1)		-- removed, under systemd this would restart forever.
+		}
 	}
 	debounce := debounceMS * time.Millisecond
 	l.Reconfigure( gpiocdev.WithDebounce(debounce) )
@@ -265,8 +284,9 @@ func main() {
 				// We have timeout, update the table
 				makeTableDatafiles( filePath+vibrationFile, vibrationDir+htmlFile, "on delay")
 			case <- timerDeBounce.C:
+				log.Error("vibration.main 7 - timerDeBounce exit, count=" + strconv.Itoa(iDebounceCnt))
 				inDeBounce = false
-				log.Error("vibration.main 7 - timerDeBounce inDeBounce now false")
+				iDebounceCnt = 0
 		}
 		time.Sleep( 2*time.Second)		// loop pause
 	}
