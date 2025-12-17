@@ -1,4 +1,4 @@
-# W420-Vibration-Sensor-In-Go
+# SW420-Vibration-Sensor-In-Go
 
 After finishing our basement with a half-bathroom, observed the effluent pump shook the exit pipe hard.
 Began to wonder about sensing the vibration and the idea became this project.
